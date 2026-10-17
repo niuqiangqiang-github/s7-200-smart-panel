@@ -1,0 +1,42 @@
+PLC连接 | enabled=True | x=17 | y=38
+IP地址 | enabled=True | x=29 | y=53
+192.168.2.1 | enabled=True | x=82 | y=51
+连接 | enabled=True | x=236 | y=50
+断开 | enabled=True | x=309 | y=50
+未连接 | enabled=True | x=384 | y=50
+数字输入（写 M10.0~M10.7） | enabled=True | x=17 | y=87
+M10.0 | enabled=True | x=42 | y=126
+M10.1 | enabled=True | x=136 | y=126
+M10.2 | enabled=True | x=229 | y=126
+M10.3 | enabled=True | x=322 | y=126
+M10.4 | enabled=True | x=42 | y=190
+M10.5 | enabled=True | x=136 | y=190
+M10.6 | enabled=True | x=229 | y=190
+M10.7 | enabled=True | x=322 | y=190
+数字输出（读 Q0.0~Q0.7） | enabled=True | x=424 | y=87
+Q0.0 | enabled=True | x=449 | y=126
+Q0.1 | enabled=True | x=542 | y=126
+Q0.2 | enabled=True | x=636 | y=126
+Q0.3 | enabled=True | x=729 | y=126
+Q0.4 | enabled=True | x=449 | y=190
+Q0.5 | enabled=True | x=542 | y=190
+Q0.6 | enabled=True | x=636 | y=190
+Q0.7 | enabled=True | x=729 | y=190
+模拟量输入（写 VW200/VW202） | enabled=True | x=17 | y=234
+VW200： | enabled=True | x=29 | y=264
+0 | enabled=True | x=77 | y=262
+写入 | enabled=True | x=170 | y=260
+VW202： | enabled=True | x=29 | y=298
+0 | enabled=True | x=77 | y=297
+写入 | enabled=True | x=170 | y=295
+模拟量输出（读 VW300/VW302） | enabled=True | x=424 | y=234
+VW300 = | enabled=True | x=436 | y=264
+0 | enabled=True | x=510 | y=261
+VW302 = | enabled=True | x=436 | y=298
+0 | enabled=True | x=510 | y=296
+寄存器监视（填地址，如 VW100 / VD100 / M10.0，自动刷新） | enabled=True | x=17 | y=334
+— | enabled=True | x=144 | y=359
+— | enabled=True | x=144 | y=388
+— | enabled=True | x=144 | y=418
+— | enabled=True | x=144 | y=447
+— | enabled=True | x=144 | y=476

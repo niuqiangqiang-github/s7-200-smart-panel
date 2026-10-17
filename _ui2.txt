@@ -1,0 +1,73 @@
+WindowsForms10.Window.8.app.0.33c0d9d_r3_ad1 | [PLC连接] | x=17 | y=38 | w=807 | h=43
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [IP地址] | x=29 | y=53 | w=47 | h=15
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [192.168.2.1] | x=82 | y=51 | w=147 | h=22
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [连接] | x=236 | y=50 | w=67 | h=21
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [断开] | x=309 | y=50 | w=67 | h=21
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [未连接] | x=384 | y=50 | w=73 | h=20
+WindowsForms10.Window.8.app.0.33c0d9d_r3_ad1 | [数字输入（写 M10.0~M10.7）] | x=17 | y=87 | w=400 | h=147
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=29 | y=104 | w=87 | h=22
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [M10.0] | x=29 | y=131 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=126 | y=104 | w=87 | h=22
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [M10.1] | x=126 | y=131 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=222 | y=104 | w=87 | h=22
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [M10.2] | x=222 | y=131 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=319 | y=104 | w=87 | h=22
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [M10.3] | x=319 | y=131 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=29 | y=163 | w=87 | h=22
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [M10.4] | x=29 | y=190 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=126 | y=163 | w=87 | h=22
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [M10.5] | x=126 | y=190 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=222 | y=163 | w=87 | h=22
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [M10.6] | x=222 | y=190 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=319 | y=163 | w=87 | h=22
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [M10.7] | x=319 | y=190 | w=87 | h=23
+WindowsForms10.Window.8.app.0.33c0d9d_r3_ad1 | [数字输出（读 Q0.0~Q0.7）] | x=424 | y=87 | w=400 | h=147
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=436 | y=104 | w=87 | h=22
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [Q0.0] | x=436 | y=131 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=532 | y=104 | w=87 | h=22
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [Q0.1] | x=532 | y=131 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=629 | y=104 | w=87 | h=22
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [Q0.2] | x=629 | y=131 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=726 | y=104 | w=87 | h=22
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [Q0.3] | x=726 | y=131 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=436 | y=163 | w=87 | h=22
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [Q0.4] | x=436 | y=190 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=532 | y=163 | w=87 | h=22
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [Q0.5] | x=532 | y=190 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=629 | y=163 | w=87 | h=22
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [Q0.6] | x=629 | y=190 | w=87 | h=23
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=726 | y=163 | w=87 | h=22
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [Q0.7] | x=726 | y=190 | w=87 | h=23
+WindowsForms10.Window.8.app.0.33c0d9d_r3_ad1 | [模拟量输入（写 VW200/VW202）] | x=17 | y=234 | w=400 | h=93
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [VW200：] | x=29 | y=264 | w=40 | h=15
+WindowsForms10.Window.8.app.0.33c0d9d_r3_ad1 | [] | x=76 | y=261 | w=87 | h=22
+WindowsForms10.Window.8.app.0.33c0d9d_r3_ad1 | [] | x=146 | y=262 | w=16 | h=21
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [0] | x=77 | y=262 | w=68 | h=19
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [写入] | x=170 | y=260 | w=60 | h=20
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [VW202：] | x=29 | y=298 | w=40 | h=15
+WindowsForms10.Window.8.app.0.33c0d9d_r3_ad1 | [] | x=76 | y=296 | w=87 | h=22
+WindowsForms10.Window.8.app.0.33c0d9d_r3_ad1 | [] | x=146 | y=296 | w=16 | h=21
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [0] | x=77 | y=297 | w=68 | h=19
+WindowsForms10.Button.app.0.33c0d9d_r3_ad1 | [写入] | x=170 | y=295 | w=60 | h=20
+WindowsForms10.Window.8.app.0.33c0d9d_r3_ad1 | [模拟量输出（读 VW300/VW302）] | x=424 | y=234 | w=400 | h=93
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [VW300 =] | x=436 | y=264 | w=69 | h=18
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [0] | x=510 | y=261 | w=80 | h=22
+WindowsForms10.Static.app.0.33c0d9d_r3_ad1 | [VW302 =] | x=436 | y=298 | w=69 | h=18
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [0] | x=510 | y=296 | w=80 | h=22
+WindowsForms10.Window.8.app.0.33c0d9d_r3_ad1 | [寄存器监视（填地址，如 VW100 / VD100 / M10.0，自动刷新）] | x=17 | y=334 | w=807 | h=153
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=29 | y=360 | w=100 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [—] | x=144 | y=360 | w=133 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=430 | y=360 | w=100 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [—] | x=545 | y=360 | w=133 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=29 | y=390 | w=100 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [—] | x=144 | y=390 | w=133 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=430 | y=390 | w=100 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [—] | x=545 | y=390 | w=133 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=29 | y=419 | w=100 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [—] | x=144 | y=419 | w=133 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=430 | y=419 | w=100 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [—] | x=545 | y=419 | w=133 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=29 | y=448 | w=100 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [—] | x=144 | y=448 | w=133 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [] | x=430 | y=448 | w=100 | h=22
+WindowsForms10.Edit.app.0.33c0d9d_r3_ad1 | [—] | x=545 | y=448 | w=133 | h=22

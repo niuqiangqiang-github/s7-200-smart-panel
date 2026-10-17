@@ -1,0 +1,14 @@
+# 编译产物
+bin/
+obj/
+publish/
+
+# Visual Studio / 用户本地配置
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# 运行日志
+*.log
