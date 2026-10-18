@@ -24,9 +24,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 发布启动流程
 每次改完代码固定三步（顺序不能乱）：
-1. `taskkill //F //IM Smart200Panel.exe` —— 关掉正在运行的旧程序，否则发布会报文件被占用
+1. `taskkill //F //IM Smart200Panel.exe || true` —— 关掉正在运行的旧程序，否则发布会报文件被占用；旧程序没运行时 taskkill 报「找不到进程」是正常的，用 `|| true` 忽略
 2. `dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -o publish`
 3. `powershell -Command "Start-Process 'C:\Users\nqq\Desktop\smart2000\publish\Smart200Panel.exe'"`
+
+发布目录有**两个**，别搞混：
+- `publish/`：框架依赖版（上面三步用这个），多个文件，目标电脑需装 .NET 8 运行时。
+- `publish-single/`：单文件自包含版（单个 exe，含运行时，拷走即用），打包命令：
+  `dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish-single`
 
 ## PLC 地址约定（S7-200 SMART + S7.Net）
 - 虚拟数字输入写 M 区：`M10.0~M10.7`
@@ -35,6 +40,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 模拟量输出读：`VW300 / VW302`
 - S7.Net 中 V 区映射到 DB1：`VW100 = DB1.DBW100`、`VD100 = DB1.DBD100`、`VB100 = DB1.DBB100`、`V100.0 = DB1.DBX100.0`
 
+## 数字输入区业务约定（改 UI 前先懂）
+- 每个输入点都是**点动**，分两种类型：**常开 NO**（常态 0、按下 1）、**常闭 NC**（常态 1、按下 0）。界面上每个点一个切换按钮，默认 NO。
+- 顶部「正常模式 / 组合启动」切换：正常模式=点动；组合启动=先选中点（变黄，不写 PLC），再「一键触发」。
+- 组合启动的「一键触发」= 全量写：选中的写激活值、未选中的写常态值；约 300ms 后自动复位回常态（给 PLC 一个扫描周期捕捉）。常闭点在组合模式里同样参与。
+- 寄存器监视按地址类型显示进制：位 → `0/1`，字节（VB）→ 十六进制（`0x1A`），字/双字（VW/VD）→ 十进制。
+
 ## WinForms 高 DPI 布局坑
 - 150% 显示缩放下 `Label.AutoSize` 会把半角字符算成全角、标签变宽压到控件，需用 `AutoSize=false` 固定宽度。
 - `GroupBox` 的 Location/Size 是外边框，内部控件坐标相对其客户区（顶部偏移约 8px）。
+- `Button` 高度 < 28 会裁掉中文文字（「写入」「一键触发」高度 24 时都被切），统一用「高 ≥ 28 + `TextAlign=MiddleCenter`」。
+- `RadioButton` / `ComboBox` 文字难居中、高 DPI 下易被切；需要「居中显示」或「点击切换」时，用 `Button`（MiddleCenter + 固定尺寸）最稳，别用 RadioButton/ComboBox。
+
+## Git 约定
+- 项目托管 Gitee，直接在 `master` 分支提交并 push。
+- 发布产物（`publish/`、`publish-single/`）和临时目录（`_diag/`）不纳入 git。
