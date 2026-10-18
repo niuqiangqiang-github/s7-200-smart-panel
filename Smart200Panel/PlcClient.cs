@@ -55,6 +55,33 @@ public class PlcClient
 
     public void WriteWord(string address, ushort value) => WriteValue(address, value);
 
+    /// <summary>读 Q 区某个字节的 8 个位（一次请求读回），如 byteIndex=0 对应 Q0.0~Q0.7。</summary>
+    public bool[] ReadOutputByteBits(int byteIndex)
+    {
+        lock (_lock)
+        {
+            if (_plc == null) throw new InvalidOperationException("尚未连接 PLC");
+            byte b = _plc.ReadBytes(DataType.Output, 0, byteIndex, 1)[0];
+            bool[] bits = new bool[8];
+            for (int i = 0; i < 8; i++) bits[i] = (b & (1 << i)) != 0;
+            return bits;
+        }
+    }
+
+    /// <summary>读 V 区从 startByte 开始的连续 count 个字（一次请求，大端序拆字），如 startByte=300 对应 VW300。</summary>
+    public ushort[] ReadVWords(int startByte, int count)
+    {
+        lock (_lock)
+        {
+            if (_plc == null) throw new InvalidOperationException("尚未连接 PLC");
+            byte[] data = _plc.ReadBytes(DataType.DataBlock, 1, startByte, count * 2);
+            ushort[] words = new ushort[count];
+            for (int i = 0; i < count; i++)
+                words[i] = (ushort)((data[i * 2] << 8) | data[i * 2 + 1]);
+            return words;
+        }
+    }
+
     /// <summary>读任意地址（如 "VW100"、"VD100"、"M10.0"），返回对应类型的值。</summary>
     public object ReadValue(string address)
     {

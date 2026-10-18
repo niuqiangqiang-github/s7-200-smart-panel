@@ -25,6 +25,13 @@ public class MainForm : Form
     private GroupBox _analogInGroup = null!;
     private readonly Button[] _inputBtns = new Button[TagMap.DigitalInputs.Length];
     private readonly Label[] _outputLamps = new Label[TagMap.DigitalOutputs.Length];
+    private readonly Button[] _typeBtns = new Button[TagMap.DigitalInputs.Length];  // 类型切换按钮（常开/常闭）
+    private readonly bool[] _isClosed = new bool[TagMap.DigitalInputs.Length];      // 每个点是否常闭
+    private readonly bool[] _comboSel = new bool[TagMap.DigitalInputs.Length];
+    private RadioButton _normalRb = null!;
+    private RadioButton _comboRb = null!;
+    private Button _triggerBtn = null!;
+    private bool _comboMode;   // false=正常模式, true=组合启动
 
     // 模拟量输入（写）/ 模拟量输出（读）
     private readonly NumericUpDown[] _analogInputs = new NumericUpDown[TagMap.AnalogInputs.Length];
@@ -49,7 +56,7 @@ public class MainForm : Form
     {
         Text = "S7-200 SMART I/O 仿真面板 V1.0";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(1240, 800);
+        ClientSize = new Size(930, 695);
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         Font = new Font("Microsoft YaHei UI", 10f);
@@ -63,21 +70,21 @@ public class MainForm : Form
     private void BuildUi()
     {
         // 顶部连接区（包进「PLC连接」分组框，控件统一垂直居中）
-        var connGroup = AddGroup("PLC连接", 15, 12, 1210, 76);
-        AddLabelFixed(connGroup, "IP地址", 18, 35, 70);
-        _ipBox = AddTextBox(connGroup, 98, 30, 220);
-        _ipBox.Height = 32;
+        var connGroup = AddGroup("PLC连接", 11, 9, 908, 64);
+        AddLabelFixed(connGroup, "IP地址", 14, 29, 53);
+        _ipBox = AddTextBox(connGroup, 74, 25, 165);
+        _ipBox.Height = 26;
         _ipBox.Text = "192.168.2.1";
-        _connectBtn = AddButton(connGroup, "连接", 328, 30, 100);
-        _connectBtn.Height = 32;
-        _disconnectBtn = AddButton(connGroup, "断开", 438, 30, 100);
-        _disconnectBtn.Height = 32;
+        _connectBtn = AddButton(connGroup, "连接", 246, 25, 75);
+        _connectBtn.Height = 26;
+        _disconnectBtn = AddButton(connGroup, "断开", 329, 25, 75);
+        _disconnectBtn.Height = 26;
         _statusLabel = new Label
         {
             Text = "未连接",
             AutoSize = false,
-            Size = new Size(110, 32),
-            Location = new Point(550, 30),
+            Size = new Size(83, 26),
+            Location = new Point(413, 25),
             TextAlign = ContentAlignment.MiddleCenter,
             BackColor = Color.Gray,
             ForeColor = Color.White,
@@ -87,43 +94,66 @@ public class MainForm : Form
         _connectBtn.Click += (s, e) => ConnectPlc();
         _disconnectBtn.Click += (s, e) => DisconnectPlc();
 
-        // 数字输入（写 M 区，点动按钮：按住导通、松开断开）。每个点位：名称框在上、按钮在下，同宽左对齐
-        _inputGroup = AddGroup("数字输入（写 M10.0~M10.7）", 15, 93, 600, 252);
+        // 数字输入（写 M 区）。顶部是模式切换，下面是 8 个点位（按钮 + 信号名 + 常开/常闭圆点）
+        _inputGroup = AddGroup("数字输入（写 M10.0~M10.7）", 11, 80, 448, 260);
+
+        // 模式切换：正常模式（点动）/ 组合启动（先选点，再一键触发）
+        _normalRb = new RadioButton { Text = "正常模式", AutoSize = true, Location = new Point(14, 24) };
+        _comboRb = new RadioButton { Text = "组合启动", AutoSize = true, Location = new Point(100, 24) };
+        _inputGroup.Controls.Add(_normalRb);
+        _inputGroup.Controls.Add(_comboRb);
+        _normalRb.Checked = true;   // 默认正常模式（先设初值再挂事件，避免构建时误触发写入）
+
+        _triggerBtn = new Button { Text = "一键触发", Location = new Point(196, 22), Size = new Size(88, 28), Visible = false };
+        _inputGroup.Controls.Add(_triggerBtn);
+        _triggerBtn.Click += (s, e) => TriggerCombo();
+        _normalRb.CheckedChanged += (s, e) => { if (_normalRb.Checked) SetMode(false); };
+        _comboRb.CheckedChanged += (s, e) => { if (_comboRb.Checked) SetMode(true); };
+
         for (int i = 0; i < _inputBtns.Length; i++)
         {
             int idx = i;
-            int cx = 18 + (i % 4) * 145;
-            int cy = 42 + (i / 4) * 96;
+            int cx = 14 + (i % 4) * 108;
+            int cy = 60 + (i / 4) * 92;
 
+            var btn = CreatePushButton(TagMap.DigitalInputs[i]);
+            btn.Location = new Point(cx, cy);
+            btn.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left && !_comboMode) SetDigitalInput(idx, true, btn); };
+            btn.MouseUp += (s, e) => { if (e.Button == MouseButtons.Left && !_comboMode) SetDigitalInput(idx, false, btn); };
+            btn.MouseLeave += (s, e) => { if (!_comboMode) SetDigitalInput(idx, false, btn); };
+            btn.Click += (s, e) => { if (_comboMode) ToggleComboSelect(idx); };
+            _inputBtns[i] = btn;
+            _inputGroup.Controls.Add(btn);
+
+            // 常开/常闭切换按钮（NO=常开、NC=常闭）
+            var typeBtn = MakeTypeButton("NO", new Point(cx, cy + 34));
+            typeBtn.Click += (s, e) => SetType(idx, !_isClosed[idx]);
+            _typeBtns[idx] = typeBtn;
+            _inputGroup.Controls.Add(typeBtn);
+            UpdateTypeButtons(idx);   // 默认 NO（常开）
+
+            // 信号名（放在切换按钮下方）
             var nameBox = new TextBox
             {
-                Location = new Point(cx, cy + 49),
-                Width = 130,
+                Location = new Point(cx, cy + 64),
+                Width = 98,
                 TextAlign = HorizontalAlignment.Center,
             };
             SetCueBanner(nameBox, "信号名");
             _inputGroup.Controls.Add(nameBox);
-
-            var btn = CreatePushButton(TagMap.DigitalInputs[i]);
-            btn.Location = new Point(cx, cy);
-            btn.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) SetDigitalInput(idx, true, btn); };
-            btn.MouseUp += (s, e) => { if (e.Button == MouseButtons.Left) SetDigitalInput(idx, false, btn); };
-            btn.MouseLeave += (s, e) => SetDigitalInput(idx, false, btn);
-            _inputBtns[i] = btn;
-            _inputGroup.Controls.Add(btn);
         }
 
         // 数字输出（读 Q 区）。每个点位：名称框在上、指示灯在下，同宽左对齐
-        var outGroup = AddGroup("数字输出（读 Q0.0~Q0.7）", 625, 93, 600, 252);
+        var outGroup = AddGroup("数字输出（读 Q0.0~Q0.7）", 469, 80, 448, 190);
         for (int i = 0; i < _outputLamps.Length; i++)
         {
-            int cx = 18 + (i % 4) * 145;
-            int cy = 42 + (i / 4) * 96;
+            int cx = 14 + (i % 4) * 108;
+            int cy = 40 + (i / 4) * 78;
 
             var nameBox = new TextBox
             {
-                Location = new Point(cx, cy + 49),
-                Width = 130,
+                Location = new Point(cx, cy + 36),
+                Width = 98,
                 TextAlign = HorizontalAlignment.Center,
             };
             SetCueBanner(nameBox, "信号名");
@@ -136,21 +166,21 @@ public class MainForm : Form
         }
 
         // 模拟量输入（写 VW 区）
-        _analogInGroup = AddGroup("模拟量输入（写 VW200/VW202）", 15, 353, 600, 140);
+        _analogInGroup = AddGroup("模拟量输入（写 VW200/VW202）", 11, 348, 448, 105);
         for (int i = 0; i < _analogInputs.Length; i++)
         {
             int idx = i;
-            AddLabelFixed(_analogInGroup, TagMap.AnalogInputs[i] + "：", 18, 45 + i * 52, 60);
+            AddLabelFixed(_analogInGroup, TagMap.AnalogInputs[i] + "：", 14, 34 + i * 40, 65);
             var nud = new NumericUpDown
             {
-                Location = new Point(88, 41 + i * 52),
-                Width = 130,
+                Location = new Point(85, 31 + i * 40),
+                Width = 100,
                 Minimum = 0,
                 Maximum = 65535,
                 Value = 0,
             };
             _analogInputs[i] = nud;
-            var btn = new Button { Text = "写入", Location = new Point(230, 40 + i * 52), Width = 90, Height = 30 };
+            var btn = new Button { Text = "写入", Location = new Point(192, 31 + i * 40), Width = 70, Height = 28 };
             btn.Click += (s, e) => WriteAnalogInput(idx);
             _analogWriteBtns[i] = btn;
             _analogInGroup.Controls.Add(nud);
@@ -158,33 +188,33 @@ public class MainForm : Form
         }
 
         // 模拟量输出（读 VW 区），值用只读框显示、固定宽度不溢出
-        var analogOutGroup = AddGroup("模拟量输出（读 VW300/VW302）", 625, 353, 600, 140);
+        var analogOutGroup = AddGroup("模拟量输出（读 VW300/VW302）", 469, 348, 448, 105);
         for (int i = 0; i < _analogOutputs.Length; i++)
         {
-            AddLabelTo(analogOutGroup, TagMap.AnalogOutputs[i] + " =", 18, 45 + i * 52);
-            var val = CreateReadOnlyBox(analogOutGroup, 130, 41 + i * 52, 120);
+            AddLabelTo(analogOutGroup, TagMap.AnalogOutputs[i] + " =", 14, 34 + i * 40);
+            var val = CreateReadOnlyBox(analogOutGroup, 100, 31 + i * 40, 95);
             val.Text = "0";
             _analogOutputs[i] = val;
         }
 
         // 寄存器监视（8 个：4 行 × 2 列），值用只读框显示、固定宽度不溢出
-        var monGroup = AddGroup("寄存器监视（填地址，如 VW100 / VD100 / M10.0，自动刷新）", 15, 501, 1210, 260);
+        var monGroup = AddGroup("寄存器监视（填地址，如 VW100 / VD100 / M10.0，自动刷新）", 11, 461, 908, 195);
         string[] cues = { "如 VW100", "如 VD100", "如 M10.0", "如 VB100", "如 VW200", "如 VW202", "如 MD100", "如 VW204" };
         for (int i = 0; i < _monitorAddrs.Length; i++)
         {
             int idx = i;
             int col = i % 2;              // 0=左列，1=右列
             int row = i / 2;
-            int x = col == 0 ? 18 : 620;
-            int y = 40 + row * 50;
+            int x = col == 0 ? 14 : 466;
+            int y = 34 + row * 40;
 
-            var tb = new TextBox { Location = new Point(x, y), Width = 150 };
+            var tb = new TextBox { Location = new Point(x, y), Width = 120 };
             tb.TextChanged += (s, e) => { lock (_addrLock) _monitorAddrCache[idx] = tb.Text.Trim(); };
             _monitorAddrs[i] = tb;
             monGroup.Controls.Add(tb);
             SetCueBanner(tb, cues[i]);
 
-            var val = CreateReadOnlyBox(monGroup, x + 172, y, 200);
+            var val = CreateReadOnlyBox(monGroup, x + 135, y, 160);
             val.Text = "—";
             _monitorValues[i] = val;
         }
@@ -194,8 +224,8 @@ public class MainForm : Form
         {
             Text = "作者：大卫博士    版本：V1.0",
             AutoSize = false,
-            Size = new Size(300, 22),
-            Location = new Point(925, 770),
+            Size = new Size(280, 22),
+            Location = new Point(635, 665),
             TextAlign = ContentAlignment.MiddleRight,
             ForeColor = Color.Gray,
         });
@@ -250,7 +280,24 @@ public class MainForm : Form
         var b = new Button
         {
             Text = text,
-            Size = new Size(130, 44),
+            Size = new Size(98, 32),
+            TextAlign = ContentAlignment.MiddleCenter,
+            FlatStyle = FlatStyle.Flat,
+            BackColor = SystemColors.Control,
+            UseVisualStyleBackColor = false,
+        };
+        b.FlatAppearance.BorderColor = Color.Gray;
+        return b;
+    }
+
+    // 常开/常闭切换按钮：固定尺寸、文字居中，避免高 DPI 下文字被裁
+    private Button MakeTypeButton(string text, Point loc)
+    {
+        var b = new Button
+        {
+            Text = text,
+            Location = loc,
+            Size = new Size(98, 28),
             TextAlign = ContentAlignment.MiddleCenter,
             FlatStyle = FlatStyle.Flat,
             BackColor = SystemColors.Control,
@@ -276,7 +323,7 @@ public class MainForm : Form
         {
             Text = text,
             AutoSize = false,
-            Size = new Size(130, 44),
+            Size = new Size(98, 32),
             TextAlign = ContentAlignment.MiddleCenter,
             BorderStyle = BorderStyle.FixedSingle,
             BackColor = Color.Gainsboro,
@@ -324,9 +371,10 @@ public class MainForm : Form
             if (IsDisposed || token.IsCancellationRequested) { _plc.Disconnect(); return; }
             ApplyStatus(ConnStatus.Connected);
             _readFailCount = 0;
+            WriteAllNormal();   // 连接成功后把所有输入点写到常态值（常开0/常闭1）
 
             // 启动后台轮询，每 500ms 刷新一次输出和寄存器
-            _pollTimer = new System.Threading.Timer(_ => PollTick(), null, 0, 500);
+            _pollTimer = new System.Threading.Timer(_ => PollTick(), null, 0, 50);
         }
         catch (Exception)
         {
@@ -342,6 +390,7 @@ public class MainForm : Form
         _cts?.Dispose();
         _cts = null;
         StopPolling();
+        WriteAllNormal();   // 断开前把所有输入点写回常态值
         _plc.Disconnect();
         ApplyStatus(ConnStatus.Disconnected);
     }
@@ -390,9 +439,11 @@ public class MainForm : Form
 
     // ======================= 写入操作（界面线程） =======================
 
-    private void SetDigitalInput(int idx, bool value, Button btn)
+    // pressed=true 表示「按下」、false 表示「松开」；具体写的值由常开/常闭决定
+    private void SetDigitalInput(int idx, bool pressed, Button btn)
     {
-        btn.BackColor = value ? Color.LimeGreen : SystemColors.Control; // 按下亮、松开灭
+        bool value = pressed ? !NormallyClosed(idx) : NormallyClosed(idx); // 按下=激活值，松开=常态值
+        btn.BackColor = value ? Color.LimeGreen : SystemColors.Control;
         WriteDigitalInput(idx, value);
     }
 
@@ -408,6 +459,95 @@ public class MainForm : Form
         if (!_plc.IsConnected) return; // 未连接时不写 PLC
         try { _plc.WriteWord(TagMap.AnalogInputs[idx], (ushort)_analogInputs[idx].Value); }
         catch { /* 写失败静默：断线检测会更新状态，不弹窗打扰 */ }
+    }
+
+    // ======================= 数字输入：模式 / 常开常闭 / 组合启动 =======================
+
+    // 每个点两个小按钮单选：NC 选中 = 常闭点（常态=1 导通，按下=0 断开）
+    private bool NormallyClosed(int idx) => _isClosed[idx];
+
+    // 把所有输入点写成常态值（常开=0，常闭=1）
+    private void WriteAllNormal()
+    {
+        if (!_plc.IsConnected) return;
+        for (int i = 0; i < TagMap.DigitalInputs.Length; i++)
+            try { _plc.WriteBit(TagMap.DigitalInputs[i], NormallyClosed(i)); } catch { }
+    }
+
+    private void SetMode(bool combo)
+    {
+        if (_comboMode == combo) return;
+        _comboMode = combo;
+
+        // 清空组合选择，并把所有点写回常态值
+        for (int i = 0; i < _comboSel.Length; i++) _comboSel[i] = false;
+        WriteAllNormal();
+
+        for (int i = 0; i < _inputBtns.Length; i++) RefreshButtonColor(i);
+        _triggerBtn.Visible = combo;
+    }
+
+    private void RefreshButtonColor(int idx)
+    {
+        bool normal = NormallyClosed(idx);   // 常态值：常闭=1(绿)，常开=0(灰)
+        Color c;
+        if (_comboMode)
+            c = _comboSel[idx] ? Color.Gold : (normal ? Color.LimeGreen : SystemColors.Control);
+        else
+            c = normal ? Color.LimeGreen : SystemColors.Control;
+        _inputBtns[idx].BackColor = c;
+    }
+
+    private void ToggleComboSelect(int idx)
+    {
+        _comboSel[idx] = !_comboSel[idx];
+        RefreshButtonColor(idx);
+    }
+
+    // 点击切换按钮在常开/常闭之间切换
+    private void SetType(int idx, bool closed)
+    {
+        if (_isClosed[idx] == closed) return;
+        _isClosed[idx] = closed;
+        UpdateTypeButtons(idx);
+        OnTypeChanged(idx);
+    }
+
+    // 刷新切换按钮的文字和高亮：NO=灰、NC=浅蓝
+    private void UpdateTypeButtons(int idx)
+    {
+        bool closed = _isClosed[idx];
+        _typeBtns[idx].Text = closed ? "NC" : "NO";
+        _typeBtns[idx].BackColor = closed ? Color.LightSteelBlue : SystemColors.Control;
+    }
+
+    // 常开/常闭切换：正常模式立即写新常态值；组合模式只改配置不写 PLC（等一键触发统一写）
+    private void OnTypeChanged(int idx)
+    {
+        if (_comboMode)
+            _comboSel[idx] = false;   // 组合模式下切类型，清掉该点选中
+        else if (_plc.IsConnected)
+            try { _plc.WriteBit(TagMap.DigitalInputs[idx], NormallyClosed(idx)); } catch { }
+        RefreshButtonColor(idx);
+    }
+
+    // 一键触发：每个点都写一遍——选中的写激活值，没选中的写常态值；300ms 后自动复位回常态
+    private async void TriggerCombo()
+    {
+        if (!_plc.IsConnected) return;
+
+        for (int i = 0; i < TagMap.DigitalInputs.Length; i++)
+        {
+            bool v = _comboSel[i] ? !NormallyClosed(i) : NormallyClosed(i);
+            try { _plc.WriteBit(TagMap.DigitalInputs[i], v); } catch { }
+        }
+
+        // 等一个 PLC 扫描周期左右，再自动清回常态、清空选中（给 PLC 足够时间捕捉「1」）
+        await Task.Delay(300);
+        if (IsDisposed || !_comboMode) return;
+        for (int i = 0; i < _comboSel.Length; i++) _comboSel[i] = false;
+        WriteAllNormal();
+        for (int i = 0; i < _inputBtns.Length; i++) RefreshButtonColor(i);
     }
 
     // ======================= 后台轮询（后台线程） =======================
@@ -431,19 +571,23 @@ public class MainForm : Form
         bool anySuccess = false;
         try
         {
-            // 数字输出：每个点位单独容错，读失败保持上次值（不整组灭灯）
-            for (int i = 0; i < _outsBuf.Length; i++)
+            // 数字输出：一次读 QB0 拆 8 位（对应 TagMap.DigitalOutputs = Q0.0~Q0.7）
+            try
             {
-                try { _outsBuf[i] = _plc.ReadBit(TagMap.DigitalOutputs[i]); anySuccess = true; }
-                catch { }
+                bool[] outs = _plc.ReadOutputByteBits(0);
+                for (int i = 0; i < _outsBuf.Length; i++) _outsBuf[i] = outs[i];
+                anySuccess = true;
             }
+            catch { }
 
-            // 模拟量输出：同样逐项容错
-            for (int i = 0; i < _aoutsBuf.Length; i++)
+            // 模拟量输出：一次读 VW300/VW302（对应 TagMap.AnalogOutputs，起始字节 300 连续 2 字）
+            try
             {
-                try { _aoutsBuf[i] = _plc.ReadWord(TagMap.AnalogOutputs[i]); anySuccess = true; }
-                catch { }
+                ushort[] aouts = _plc.ReadVWords(300, 2);
+                for (int i = 0; i < _aoutsBuf.Length; i++) _aoutsBuf[i] = aouts[i];
+                anySuccess = true;
             }
+            catch { }
 
             // 寄存器监视：读地址缓存加锁
             for (int i = 0; i < _monBuf.Length; i++)
@@ -451,7 +595,11 @@ public class MainForm : Form
                 string a;
                 lock (_addrLock) { a = _monitorAddrCache[i]; }
                 if (string.IsNullOrEmpty(a)) { _monBuf[i] = "—"; continue; }
-                try { _monBuf[i] = _plc.ReadValue(a).ToString() ?? "—"; anySuccess = true; }
+                try
+                {
+                    _monBuf[i] = FormatMonitorValue(_plc.ReadValue(a));
+                    anySuccess = true;
+                }
                 catch { _monBuf[i] = "错误"; }
             }
         }
@@ -494,6 +642,21 @@ public class MainForm : Form
         catch { }
     }
 
+    // 按地址类型显示进制：位=0/1，字节=十六进制，字/双字=十进制
+    private static string FormatMonitorValue(object v)
+    {
+        switch (v)
+        {
+            case bool b: return b ? "1" : "0";
+            case byte by: return "0x" + by.ToString("X2");
+            case ushort w: return w.ToString();
+            case short s: return s.ToString();
+            case uint d: return d.ToString();
+            case int i: return i.ToString();
+            default: return v?.ToString() ?? "—";
+        }
+    }
+
     private void StopPolling()
     {
         _pollTimer?.Dispose();
@@ -508,6 +671,7 @@ public class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
+        WriteAllNormal();   // 关程序前把所有输入点写回常态值
         StopPolling();
         _plc.Disconnect();
         base.OnFormClosing(e);
