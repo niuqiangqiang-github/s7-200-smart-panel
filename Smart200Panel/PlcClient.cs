@@ -22,7 +22,7 @@ public class PlcClient
         var plc = new Plc(CpuType.S7200Smart, ip, rack, slot)
         {
             ReadTimeout = 1000,   // 读超时 1 秒，断线时不会卡太久
-            WriteTimeout = 1000,
+            WriteTimeout = 250,   // 写超时 250ms：半开连接断开/关窗时不至于长时间卡界面
         };
         // 先挂到 _plc 上：连接期间调用 Disconnect() 会 Close 掉它，从而中断连接
         _plc = plc;

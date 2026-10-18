@@ -7,7 +7,7 @@ using System.Windows.Forms;
 namespace Smart200Panel;
 
 /// <summary>
-/// 主窗口：连接 PLC，模拟输入（写 M 区），显示输出（读 Q 区），模拟量与寄存器监视。
+/// 主窗口：连接 PLC，模拟输入（写 M 区），显示输出（读 Q 区），模拟量显示。
 /// 界面用代码直接生成（不用设计器文件），方便阅读和修改。
 /// </summary>
 public class MainForm : Form
@@ -32,31 +32,25 @@ public class MainForm : Form
     private RadioButton _comboRb = null!;
     private Button _triggerBtn = null!;
     private bool _comboMode;   // false=正常模式, true=组合启动
+    private bool _comboBusy;   // 组合触发进行中，防重复点击
 
     // 模拟量输入（写）/ 模拟量输出（读）
     private readonly NumericUpDown[] _analogInputs = new NumericUpDown[TagMap.AnalogInputs.Length];
     private readonly Button[] _analogWriteBtns = new Button[TagMap.AnalogInputs.Length];
     private readonly TextBox[] _analogOutputs = new TextBox[TagMap.AnalogOutputs.Length];
 
-    // 寄存器监视（8 个：4 行 × 2 列，地址可填）
-    private readonly TextBox[] _monitorAddrs = new TextBox[8];
-    private readonly TextBox[] _monitorValues = new TextBox[8];
-    private readonly string[] _monitorAddrCache = new string[8]; // 后台线程只读缓存，避免跨线程读控件
-
     private System.Threading.Timer _pollTimer;
     private CancellationTokenSource _cts;   // 连接期间用，点「断开」可取消连接
     private int _polling;                        // 1=轮询进行中，防重入
     private int _readFailCount;                  // 连续整轮读失败次数，用于判定断线
-    private readonly object _addrLock = new();   // 保护监视地址缓存的跨线程读写
     private readonly bool[] _outsBuf = new bool[TagMap.DigitalOutputs.Length];
     private readonly ushort[] _aoutsBuf = new ushort[TagMap.AnalogOutputs.Length];
-    private readonly string[] _monBuf = new string[8];
 
     public MainForm()
     {
         Text = "S7-200 SMART I/O 仿真面板 V1.0";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(930, 695);
+        ClientSize = new Size(930, 500);
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         Font = new Font("Microsoft YaHei UI", 10f);
@@ -197,35 +191,13 @@ public class MainForm : Form
             _analogOutputs[i] = val;
         }
 
-        // 寄存器监视（8 个：4 行 × 2 列），值用只读框显示、固定宽度不溢出
-        var monGroup = AddGroup("寄存器监视（填地址，如 VW100 / VD100 / M10.0，自动刷新）", 11, 461, 908, 195);
-        string[] cues = { "如 VW100", "如 VD100", "如 M10.0", "如 VB100", "如 VW200", "如 VW202", "如 MD100", "如 VW204" };
-        for (int i = 0; i < _monitorAddrs.Length; i++)
-        {
-            int idx = i;
-            int col = i % 2;              // 0=左列，1=右列
-            int row = i / 2;
-            int x = col == 0 ? 14 : 466;
-            int y = 34 + row * 40;
-
-            var tb = new TextBox { Location = new Point(x, y), Width = 120 };
-            tb.TextChanged += (s, e) => { lock (_addrLock) _monitorAddrCache[idx] = tb.Text.Trim(); };
-            _monitorAddrs[i] = tb;
-            monGroup.Controls.Add(tb);
-            SetCueBanner(tb, cues[i]);
-
-            var val = CreateReadOnlyBox(monGroup, x + 135, y, 160);
-            val.Text = "—";
-            _monitorValues[i] = val;
-        }
-
         // 底部信息栏：作者 + 版本（靠右）
         Controls.Add(new Label
         {
             Text = "作者：大卫博士    版本：V1.0",
             AutoSize = false,
             Size = new Size(280, 22),
-            Location = new Point(635, 665),
+            Location = new Point(635, 470),
             TextAlign = ContentAlignment.MiddleRight,
             ForeColor = Color.Gray,
         });
@@ -372,8 +344,9 @@ public class MainForm : Form
             ApplyStatus(ConnStatus.Connected);
             _readFailCount = 0;
             WriteAllNormal();   // 连接成功后把所有输入点写到常态值（常开0/常闭1）
+            for (int i = 0; i < _inputBtns.Length; i++) RefreshButtonColor(i);   // 重连后输入按钮恢复常态色
 
-            // 启动后台轮询，每 500ms 刷新一次输出和寄存器
+            // 启动后台轮询，每 50ms 刷新一次输出和寄存器
             _pollTimer = new System.Threading.Timer(_ => PollTick(), null, 0, 50);
         }
         catch (Exception)
@@ -392,6 +365,7 @@ public class MainForm : Form
         StopPolling();
         WriteAllNormal();   // 断开前把所有输入点写回常态值
         _plc.Disconnect();
+        ResetDisplay();     // 断开后界面复位（灯灭、数值归零、按钮回常态）
         ApplyStatus(ConnStatus.Disconnected);
     }
 
@@ -471,7 +445,10 @@ public class MainForm : Form
     {
         if (!_plc.IsConnected) return;
         for (int i = 0; i < TagMap.DigitalInputs.Length; i++)
-            try { _plc.WriteBit(TagMap.DigitalInputs[i], NormallyClosed(i)); } catch { }
+        {
+            try { _plc.WriteBit(TagMap.DigitalInputs[i], NormallyClosed(i)); }
+            catch { return; }   // 一次写失败说明连接已断，剩余点不再写，避免逐个超时卡界面
+        }
     }
 
     private void SetMode(bool combo)
@@ -534,20 +511,30 @@ public class MainForm : Form
     // 一键触发：每个点都写一遍——选中的写激活值，没选中的写常态值；300ms 后自动复位回常态
     private async void TriggerCombo()
     {
-        if (!_plc.IsConnected) return;
+        if (!_plc.IsConnected || _comboBusy) return;
 
-        for (int i = 0; i < TagMap.DigitalInputs.Length; i++)
+        _comboBusy = true;
+        _triggerBtn.Enabled = false;   // 触发期间禁点，防止 300ms 内重复触发互相干扰
+        try
         {
-            bool v = _comboSel[i] ? !NormallyClosed(i) : NormallyClosed(i);
-            try { _plc.WriteBit(TagMap.DigitalInputs[i], v); } catch { }
-        }
+            for (int i = 0; i < TagMap.DigitalInputs.Length; i++)
+            {
+                bool v = _comboSel[i] ? !NormallyClosed(i) : NormallyClosed(i);
+                try { _plc.WriteBit(TagMap.DigitalInputs[i], v); } catch { }
+            }
 
-        // 等一个 PLC 扫描周期左右，再自动清回常态、清空选中（给 PLC 足够时间捕捉「1」）
-        await Task.Delay(300);
-        if (IsDisposed || !_comboMode) return;
-        for (int i = 0; i < _comboSel.Length; i++) _comboSel[i] = false;
-        WriteAllNormal();
-        for (int i = 0; i < _inputBtns.Length; i++) RefreshButtonColor(i);
+            // 等一个 PLC 扫描周期左右，再自动清回常态、清空选中（给 PLC 足够时间捕捉「1」）
+            await Task.Delay(300);
+            if (IsDisposed || !_comboMode) return;
+            for (int i = 0; i < _comboSel.Length; i++) _comboSel[i] = false;
+            WriteAllNormal();
+            for (int i = 0; i < _inputBtns.Length; i++) RefreshButtonColor(i);
+        }
+        finally
+        {
+            _comboBusy = false;
+            if (!IsDisposed) _triggerBtn.Enabled = true;
+        }
     }
 
     // ======================= 后台轮询（后台线程） =======================
@@ -571,37 +558,24 @@ public class MainForm : Form
         bool anySuccess = false;
         try
         {
-            // 数字输出：一次读 QB0 拆 8 位（对应 TagMap.DigitalOutputs = Q0.0~Q0.7）
+            // 数字输出：一次读 Q 字节拆 8 位（字节号由 TagMap.DigitalOutputs 第一个地址推出）
             try
             {
-                bool[] outs = _plc.ReadOutputByteBits(0);
+                bool[] outs = _plc.ReadOutputByteBits(TagMap.DigitalOutputByte);
                 for (int i = 0; i < _outsBuf.Length; i++) _outsBuf[i] = outs[i];
                 anySuccess = true;
             }
             catch { }
 
-            // 模拟量输出：一次读 VW300/VW302（对应 TagMap.AnalogOutputs，起始字节 300 连续 2 字）
+            // 模拟量输出：一次读连续字（起始字节、字数由 TagMap.AnalogOutputs 推出）
             try
             {
-                ushort[] aouts = _plc.ReadVWords(300, 2);
+                ushort[] aouts = _plc.ReadVWords(TagMap.AnalogOutputStartByte, TagMap.AnalogOutputs.Length);
                 for (int i = 0; i < _aoutsBuf.Length; i++) _aoutsBuf[i] = aouts[i];
                 anySuccess = true;
             }
             catch { }
 
-            // 寄存器监视：读地址缓存加锁
-            for (int i = 0; i < _monBuf.Length; i++)
-            {
-                string a;
-                lock (_addrLock) { a = _monitorAddrCache[i]; }
-                if (string.IsNullOrEmpty(a)) { _monBuf[i] = "—"; continue; }
-                try
-                {
-                    _monBuf[i] = FormatMonitorValue(_plc.ReadValue(a));
-                    anySuccess = true;
-                }
-                catch { _monBuf[i] = "错误"; }
-            }
         }
         finally
         {
@@ -615,7 +589,7 @@ public class MainForm : Form
             {
                 StopPolling();
                 _plc.Disconnect();
-                try { BeginInvoke(new Action(() => { if (!IsDisposed) ApplyStatus(ConnStatus.Dropped); })); }
+                try { BeginInvoke(new Action(() => { if (!IsDisposed) { ResetDisplay(); ApplyStatus(ConnStatus.Dropped); } })); }
                 catch { }
                 return;
             }
@@ -635,32 +609,32 @@ public class MainForm : Form
                     _outputLamps[i].BackColor = _outsBuf[i] ? Color.LimeGreen : Color.Gainsboro;
                 for (int i = 0; i < _aoutsBuf.Length; i++)
                     _analogOutputs[i].Text = _aoutsBuf[i].ToString();
-                for (int i = 0; i < _monBuf.Length; i++)
-                    _monitorValues[i].Text = _monBuf[i];
             }));
         }
         catch { }
-    }
-
-    // 按地址类型显示进制：位=0/1，字节=十六进制，字/双字=十进制
-    private static string FormatMonitorValue(object v)
-    {
-        switch (v)
-        {
-            case bool b: return b ? "1" : "0";
-            case byte by: return "0x" + by.ToString("X2");
-            case ushort w: return w.ToString();
-            case short s: return s.ToString();
-            case uint d: return d.ToString();
-            case int i: return i.ToString();
-            default: return v?.ToString() ?? "—";
-        }
     }
 
     private void StopPolling()
     {
         _pollTimer?.Dispose();
         _pollTimer = null;
+    }
+
+    // 断开/断线后把界面显示复位：输出灯灭、模拟量归零、输入按钮熄灭、常开/常闭回到 NO
+    private void ResetDisplay()
+    {
+        for (int i = 0; i < _outputLamps.Length; i++)
+            _outputLamps[i].BackColor = Color.Gainsboro;
+        for (int i = 0; i < _analogOutputs.Length; i++)
+            _analogOutputs[i].Text = "0";
+        for (int i = 0; i < _comboSel.Length; i++)
+            _comboSel[i] = false;
+        for (int i = 0; i < _isClosed.Length; i++)
+            _isClosed[i] = false;   // 常开/常闭类型也复位回常开
+        for (int i = 0; i < _inputBtns.Length; i++)
+            _inputBtns[i].BackColor = SystemColors.Control;   // 输入按钮全部熄灭
+        for (int i = 0; i < _typeBtns.Length; i++)
+            UpdateTypeButtons(i);   // NO/NC 切换按钮回 NO
     }
 
     protected override void OnMouseDown(MouseEventArgs e)

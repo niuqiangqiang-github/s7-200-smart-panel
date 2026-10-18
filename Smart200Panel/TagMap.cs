@@ -30,4 +30,20 @@ public static class TagMap
 
     /// <summary>模拟量输出（PLC → 面板，读 VW 区；约定程序把结果写到 VW300/VW302）。</summary>
     public static readonly string[] AnalogOutputs = { "VW300", "VW302" };
+
+    /// <summary>数字输出所在 Q 字节号（由第一个地址 "Q0.0" 推出 0；假定 8 个点连续在同一字节）。</summary>
+    public static int DigitalOutputByte => ParseByteIndex(DigitalOutputs[0]);
+
+    /// <summary>模拟量输出起始字节（由第一个地址 "VW300" 推出 300；假定各字连续）。</summary>
+    public static int AnalogOutputStartByte => ParseVWordStart(AnalogOutputs[0]);
+
+    // "Q0.0" -> 0：取区号字母之后、'.' 之前的数字
+    private static int ParseByteIndex(string addr)
+    {
+        int dot = addr.IndexOf('.');
+        return int.Parse(addr.Substring(1, dot - 1));
+    }
+
+    // "VW300" -> 300：取 "VW" 之后的数字
+    private static int ParseVWordStart(string addr) => int.Parse(addr.Substring(2));
 }
