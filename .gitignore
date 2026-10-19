@@ -1,8 +1,9 @@
 # 编译产物
 bin/
 obj/
-publish/
-publish-single/
+/publish/
+/publish-single/
+Smart200Panel/publish/
 _diag/
 
 # Visual Studio / 用户本地配置

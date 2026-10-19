@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dotnet build Smart200Panel/Smart200Panel.csproj --nologo -v q -clp:ErrorsOnly 1>&2 || exit 2"
+          }
+        ]
+      }
+    ]
+  }
+}
