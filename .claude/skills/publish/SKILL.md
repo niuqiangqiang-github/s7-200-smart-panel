@@ -21,6 +21,6 @@ disable-model-invocation: true
 
 4. 启动新程序：
    - 框架依赖版：
-     `powershell -Command "Start-Process 'C:\Users\nqq\Desktop\smart2000\publish\Smart200Panel.exe'"`
+     `powershell -Command "Start-Process '.\publish\Smart200Panel.exe'"`
    - 单文件版：
-     `powershell -Command "Start-Process 'C:\Users\nqq\Desktop\smart2000\publish-single\Smart200Panel.exe'"`
+     `powershell -Command "Start-Process '.\publish-single\Smart200Panel.exe'"`

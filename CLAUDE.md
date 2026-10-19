@@ -27,7 +27,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 每次改完代码固定三步（顺序不能乱），或直接用 `/publish` 技能（single 参数打包单文件版）：
 1. `taskkill //F //IM Smart200Panel.exe || true` —— 关掉正在运行的旧程序，否则发布会报文件被占用；旧程序没运行时 taskkill 报「找不到进程」是正常的，用 `|| true` 忽略
 2. `dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -o publish`
-3. `powershell -Command "Start-Process 'C:\Users\nqq\Desktop\smart2000\publish\Smart200Panel.exe'"`
+3. `powershell -Command "Start-Process '.\publish\Smart200Panel.exe'"`
 
 发布目录有**两个**，别搞混：
 - `publish/`：框架依赖版（上面三步用这个），多个文件，目标电脑需装 .NET 8 运行时。

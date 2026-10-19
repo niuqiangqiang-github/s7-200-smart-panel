@@ -27,7 +27,7 @@
 ```bash
 taskkill //F //IM Smart200Panel.exe
 dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -o publish
-powershell -Command "Start-Process 'C:\Users\nqq\Desktop\smart2000\publish\Smart200Panel.exe'"
+powershell -Command "Start-Process '.\publish\Smart200Panel.exe'"
 ```
 
 1. 第一步：关掉正在运行的旧程序（否则发布会报文件被占用）。
