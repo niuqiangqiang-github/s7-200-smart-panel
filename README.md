@@ -66,7 +66,7 @@ S7-200 SMART 出厂默认**禁止电脑通过以太网读写数据**，不改的
 ## 目录结构
 
 ```
-smart2000/
+s7-200-smart-panel/
 ├── Smart200Panel/      # 主程序（WinForms 面板）
 │   ├── MainForm.cs     # 界面 + 后台轮询
 │   ├── PlcClient.cs    # S7 通信封装（连接/读写）

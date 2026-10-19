@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# smart2000 面板项目约定
+# s7-200-smart-panel 面板项目约定
 
 ## 项目是什么
 一个 Windows 面板程序（C# WinForms + S7.Net），通过以太网（ISO-on-TCP 端口 102，S7 协议）连接真实 S7-200 SMART PLC，用来模拟数字/模拟量输入、显示输出。不是软 PLC 模拟器。
