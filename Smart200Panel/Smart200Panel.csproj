@@ -9,6 +9,9 @@
     <AssemblyName>Smart200Panel</AssemblyName>
     <RootNamespace>Smart200Panel</RootNamespace>
     <ApplicationHighDpiMode>DpiUnawareGdiScaled</ApplicationHighDpiMode>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- 版本号统一在 version.txt 维护，发布脚本每次打包自动 +1 -->
+    <Version>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/version.txt').Trim())</Version>
   </PropertyGroup>
 
   <ItemGroup>

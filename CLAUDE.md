@@ -24,16 +24,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - S7.Net 中 V 区映射到 DB1：`VW100 = DB1.DBW100`、`VD100 = DB1.DBD100`、`VB100 = DB1.DBB100`、`V100.0 = DB1.DBX100.0`
 
 ## 发布启动流程
-每次改完代码固定三步（顺序不能乱），或直接用 `/publish` 技能（single 参数打包单文件版）：
-1. `taskkill //F //IM Smart200Panel.exe || true` —— 关掉正在运行的旧程序，否则发布会报文件被占用；旧程序没运行时 taskkill 报「找不到进程」是正常的，用 `|| true` 忽略
-2. `dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -o publish`
-3. `powershell -Command "Start-Process '.\publish\Smart200Panel.exe'"`
+每次改完代码固定流程（顺序不能乱），或直接用 `/publish` 技能（single 参数打包单文件版）。成品 exe 统一叫 `S7-200SMART-I／O面板.exe`：Windows 文件名不允许半角 `/`，用全角 `／`；程序集名仍是 `Smart200Panel`，只改文件名不影响运行。
+1. `taskkill //F //IM "S7-200SMART-I／O面板.exe" || true` —— 关掉正在运行的旧程序，否则发布会报文件被占用；旧程序没运行时 taskkill 报「找不到进程」是正常的，用 `|| true` 忽略
+2. 版本号 +1：`v=$(cat Smart200Panel/version.txt); IFS=. read -r a b c <<< "$v"; echo "$a.$b.$((c+1))" > Smart200Panel/version.txt`
+3. `dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -o publish`
+4. 改名：`mv -f "publish/Smart200Panel.exe" "publish/S7-200SMART-I／O面板.exe"`
+5. `powershell -Command "Start-Process '.\publish\S7-200SMART-I／O面板.exe'"`
+
+版本号只在 `Smart200Panel/version.txt` 一处维护（如 `1.0.3`），每次打包前自动 +1，界面标题和右下角作者栏的版本都从程序集读取，不用改代码。
 
 发布目录有**两个**，别搞混：
-- `publish/`：框架依赖版（上面三步用这个），多个文件，目标电脑需装 .NET 8 运行时。
+- `publish/`：框架依赖版（上面流程用这个），多个文件，目标电脑需装 .NET 8 运行时。
 - `publish-single/`：单文件自包含版（单个 exe，含运行时，拷走即用），打包命令：
   `dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -o publish-single`
-  注意：**必须加 `-p:IncludeNativeLibrariesForSelfExtract=true`**，否则 WPF 原生库（`*_cor3.dll`）不会合并进 exe，目录里残留一堆 DLL、不是真单文件；`-p:DebugType=None` 顺带去 `.pdb`。
+  注意：**必须加 `-p:IncludeNativeLibrariesForSelfExtract=true`**，否则 WPF 原生库（`*_cor3.dll`）不会合并进 exe，目录里残留一堆 DLL、不是真单文件；`-p:DebugType=None` 顺带去 `.pdb`。打包后同样改名为 `S7-200SMART-I／O面板.exe`（`mv -f "publish-single/Smart200Panel.exe" "publish-single/S7-200SMART-I／O面板.exe"`）。
 
 ## Git 约定
 - 项目托管 Gitee，直接在 `master` 分支提交并 push。

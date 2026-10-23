@@ -13,6 +13,7 @@ namespace Smart200Panel;
 public class MainForm : Form
 {
     private readonly PlcClient _plc = new();
+    private readonly string _version = Application.ProductVersion.Split('+')[0];   // 来自 csproj/version.txt
 
     // 顶部连接区
     private TextBox _ipBox = null!;
@@ -48,12 +49,13 @@ public class MainForm : Form
 
     public MainForm()
     {
-        Text = "S7-200 SMART I/O 仿真面板 V1.0";
+        Text = $"S7-200 SMART I/O 仿真面板 V{_version}";
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(930, 500);
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         Font = new Font("Microsoft YaHei UI", 10f);
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);   // 标题栏/任务栏用 exe 内嵌图标
 
         BuildUi();
         ApplyStatus(ConnStatus.Disconnected);
@@ -194,7 +196,7 @@ public class MainForm : Form
         // 底部信息栏：作者 + 版本（靠右）
         Controls.Add(new Label
         {
-            Text = "作者：大卫博士    版本：V1.0",
+            Text = $"作者：niuqiangqiang    版本：V{_version}",
             AutoSize = false,
             Size = new Size(280, 22),
             Location = new Point(635, 470),
