@@ -22,17 +22,50 @@
 
 需要先安装 [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)。
 
-发布并启动（三步，顺序不能乱）：
+日常交付用**单文件版**（自带运行时，拷到任意 Windows 电脑即可运行）；本机快速验证可以用框架依赖版。
+
+### 方式一：单文件版（推荐）
+
+按顺序执行，顺序不能乱：
 
 ```bash
-taskkill //F //IM Smart200Panel.exe
-dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -o publish
-powershell -Command "Start-Process '.\publish\Smart200Panel.exe'"
+# 1. 关掉正在运行的旧程序（旧程序没运行时提示找不到进程属正常）
+taskkill //F //IM "S7-200SMART-I／O面板.exe" || true
+
+# 2. 版本号 +1（界面标题和右下角的版本显示会自动跟着变）
+v=$(cat Smart200Panel/version.txt); IFS=. read -r a b c <<< "$v"; echo "$a.$b.$((c+1))" > Smart200Panel/version.txt
+
+# 3. 打包单文件版
+dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -o publish-single
+
+# 4. 改名（Windows 文件名不允许半角 /，这里用全角 ／）
+mv -f "publish-single/Smart200Panel.exe" "publish-single/S7-200SMART-I／O面板.exe"
+
+# 5. 启动
+powershell -Command "Start-Process '.\publish-single\S7-200SMART-I／O面板.exe'"
 ```
 
-1. 第一步：关掉正在运行的旧程序（否则发布会报文件被占用）。
-2. 第二步：编译发布，产物输出到 `publish/` 目录。
-3. 第三步：启动新程序。
+说明：
+
+- `-p:IncludeNativeLibrariesForSelfExtract=true` 不能省，否则原生库不会合进 exe，目录里会残留一堆 DLL，就不是真正的单文件了。
+- 产物只有 `publish-single/S7-200SMART-I／O面板.exe` 一个文件，拷走即用。
+
+### 方式二：框架依赖版（本机快速验证）
+
+```bash
+taskkill //F //IM "S7-200SMART-I／O面板.exe" || true
+dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -o publish
+mv -f "publish/Smart200Panel.exe" "publish/S7-200SMART-I／O面板.exe"
+powershell -Command "Start-Process '.\publish\S7-200SMART-I／O面板.exe'"
+```
+
+这个版本体积小，但目标电脑必须先装 .NET 8 运行时。
+
+### 本地调试
+
+```bash
+dotnet run --project Smart200Panel
+```
 
 程序打开后，在「PLC连接」区填 PLC 的 IP 地址，点「连接」即可。
 
@@ -73,5 +106,36 @@ s7-200-smart-panel/
 │   ├── TagMap.cs       # 地址映射表（唯一改 PLC 地址的地方）
 │   └── Program.cs      # 程序入口
 ├── _verifyc/           # 通信验证小工具
-└── publish/            # 发布产物（已 git 忽略）
+├── publish/            # 框架依赖版发布产物（已 git 忽略）
+└── publish-single/     # 单文件版发布产物（已 git 忽略）
 ```
+
+## 更新日志
+
+> 版本号统一在 `Smart200Panel/version.txt` 维护，每次打包自动 +1，界面标题和右下角版本显示会跟着变。
+
+### 1.0.5（2026-10-24）
+
+- 修复：无边框窗体仍能被最大化（Win+↑ 或系统命令），导致标题栏按钮和内容区错位；现在窗口尺寸完全固定
+- 恢复：系统菜单（Alt+Space）、任务栏窗口菜单和键盘最小化，窗口被拖出屏幕后可以找回来
+- 优化：合并重复的 Win32 函数声明、删除失效代码、关闭时释放标题栏图标位图
+
+### 1.0.4（2026-10-24）
+
+- 优化：置顶、最小化、关闭三个按钮统一为矢量绘制，图标大小和间距完全一致
+- 修复：三个按钮遮挡标题栏下方分割线
+- 优化：置顶激活时的效果从「整块蓝底」改为「图钉填充实心」
+- 优化：去掉点击按钮后残留的焦点虚线框
+
+### 1.0.3（2026-10-24）
+
+- 优化：「置顶」按钮从中文文字改为图钉图标，未置顶空心、已置顶实心
+
+### 1.0.2（2026-10-24）
+
+- 新增：置顶开关（窗口始终显示在最前），每次启动默认关闭
+- 变更：Windows 11 下原生标题栏无法绘制自定义按钮，改为自绘标题栏（图标 + 标题 + 置顶 + 最小化 + 关闭）
+
+### 1.0.1（2026-10-23）
+
+- 首个带版本号的发布版本：新增程序图标、作者署名，打包时版本号自动递增

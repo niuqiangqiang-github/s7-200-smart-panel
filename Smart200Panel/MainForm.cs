@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Windows.Forms;
@@ -51,11 +52,12 @@ public class MainForm : Form
     {
         Text = $"S7-200 SMART I/O 仿真面板 V{_version}";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(930, 500);
-        FormBorderStyle = FormBorderStyle.FixedSingle;
+        FormBorderStyle = FormBorderStyle.None;            // 标题栏由程序自绘（见 BuildTitleBar）
         MaximizeBox = false;
+        ClientSize = new Size(930, 500 + TitleBarHeight);  // 内容区仍是 930x500，上方多一条标题栏
+        MinimumSize = MaximumSize = Size;                  // 固定尺寸：贴边、拖动都不能改变大小
         Font = new Font("Microsoft YaHei UI", 10f);
-        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);   // 标题栏/任务栏用 exe 内嵌图标
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);   // 任务栏用 exe 内嵌图标
 
         BuildUi();
         ApplyStatus(ConnStatus.Disconnected);
@@ -65,6 +67,19 @@ public class MainForm : Form
 
     private void BuildUi()
     {
+        BuildContent();
+        BuildTitleBar();
+
+        // 先加内容区（Fill）再加标题栏（Top）：WinForms 按相反顺序停靠，标题栏先占顶部
+        Controls.Add(_contentPanel);
+        Controls.Add(_titleBar);
+    }
+
+    private void BuildContent()
+    {
+        _contentPanel = new Panel { Dock = DockStyle.Fill, BackColor = SystemColors.Control };
+        _contentPanel.MouseDown += (s, e) => ActiveControl = null;   // 点空白处，让输入框失去焦点
+
         // 顶部连接区（包进「PLC连接」分组框，控件统一垂直居中）
         var connGroup = AddGroup("PLC连接", 11, 9, 908, 64);
         AddLabelFixed(connGroup, "IP地址", 14, 29, 53);
@@ -194,7 +209,7 @@ public class MainForm : Form
         }
 
         // 底部信息栏：作者 + 版本（靠右）
-        Controls.Add(new Label
+        _contentPanel.Controls.Add(new Label
         {
             Text = $"作者：niuqiangqiang    版本：V{_version}",
             AutoSize = false,
@@ -245,7 +260,7 @@ public class MainForm : Form
     {
         var g = new GroupBox { Text = title, Location = new Point(x, y), Size = new Size(w, h) };
         g.MouseDown += (s, e) => ActiveControl = null; // 点分组框空白处，让输入框失去焦点
-        Controls.Add(g);
+        _contentPanel.Controls.Add(g);
         return g;
     }
 
@@ -282,13 +297,14 @@ public class MainForm : Form
     }
 
     // 给单行输入框加灰色占位提示（Windows 原生 cue banner）
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
+    // 这是 user32 SendMessage 的字符串版重载，与标题栏用的 IntPtr 版区分开，避免同名两套声明改漏
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")]
+    private static extern IntPtr SendMessageText(IntPtr hWnd, int msg, IntPtr wParam, string lParam);
 
     private static void SetCueBanner(TextBox tb, string cue)
     {
         const int EM_SETCUEBANNER = 0x1501;
-        SendMessage(tb.Handle, EM_SETCUEBANNER, (IntPtr)1, cue);
+        SendMessageText(tb.Handle, EM_SETCUEBANNER, (IntPtr)1, cue);
     }
 
     private Label CreateLamp(string text)
@@ -321,6 +337,267 @@ public class MainForm : Form
         return tb;
     }
 
+    // ======================= 自定义标题栏 =======================
+
+    // Windows 11 的原生标题栏由 DWM 合成，应用自绘会被覆盖，所以整个标题栏由程序自己搭建：
+    // 图标 + 标题 + 置顶 + 最小化 + 关闭。窗口用 FormBorderStyle.None。
+
+    private const int TitleBarHeight = 32;
+    private const int TitleButtonWidth = 46;                  // 三个窗口按钮等宽，紧贴排列
+    private const int TitleButtonHeight = TitleBarHeight - 1; // 少 1px，让出底部那条分割线
+    private const float IconHalf = 5f;                        // 图标可视区半径（10x10）
+    private const float IconStroke = 1.6f;                    // 统一线宽，保证三个图标粗细一致
+    private const int WM_NCLBUTTONDOWN = 0x00A1;
+    private const int HTCAPTION = 2;
+    private const int WM_SYSCOMMAND = 0x0112;
+    private const int SC_MAXIMIZE = 0xF030;
+    private const int WS_MAXIMIZEBOX = 0x00010000;
+    private const int WS_MINIMIZEBOX = 0x00020000;
+    private const int WS_SYSMENU = 0x00080000;
+
+    private enum TitleIcon { Pin, Minimize, Close }
+
+    // 自绘图标的标题栏按钮：屏蔽系统焦点虚线框（点完按钮会留一圈虚线，很难看）
+    private sealed class TitleBarButton : Button
+    {
+        public TitleBarButton()
+        {
+            SetStyle(ControlStyles.Selectable, false);   // 不参与焦点，点完不会留下焦点框
+        }
+
+        protected override bool ShowFocusCues => false;
+    }
+
+    private static readonly Color IconColor = Color.FromArgb(70, 70, 70);
+
+    private Panel _titleBar = null!;
+    private Panel _contentPanel = null!;
+    private PictureBox _iconBox = null!;
+    private Button _pinBtn = null!;
+    private ToolTip _tip = null!;
+
+    [DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hWnd, int attr, ref int value, int size);
+
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            var cp = base.CreateParams;
+            // 无边框窗体下 MaximizeBox/MinimizeBox 属性会失效，直接改窗口样式位
+            cp.Style |= WS_SYSMENU | WS_MINIMIZEBOX;   // 保留系统菜单（Alt+Space）和任务栏窗口菜单
+            cp.Style &= ~WS_MAXIMIZEBOX;               // 禁止最大化，避免自绘按钮位置错乱
+            return cp;
+        }
+    }
+
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        int round = 2;   // DWMWCP_ROUND：Win11 圆角；旧系统调用失败不影响运行
+        DwmSetWindowAttribute(Handle, 33, ref round, sizeof(int));
+    }
+
+    protected override void WndProc(ref Message m)
+    {
+        // 兜底：任何来源的最大化请求都忽略，窗口尺寸固定不变
+        if (m.Msg == WM_SYSCOMMAND && (m.WParam.ToInt64() & 0xFFF0) == SC_MAXIMIZE) return;
+        base.WndProc(ref m);
+    }
+
+    private void BuildTitleBar()
+    {
+        Color barColor = Color.FromArgb(243, 243, 243);
+        Color textColor = Color.FromArgb(60, 60, 60);
+
+        _titleBar = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = TitleBarHeight,
+            BackColor = barColor,
+        };
+        _titleBar.Paint += (s, e) =>
+        {
+            using var pen = new Pen(Color.FromArgb(220, 220, 220));
+            // 半像素偏移，让 1px 分割线正好落在最后一行，不会被抗锯齿糊成两行
+            e.Graphics.DrawLine(pen, 0, TitleBarHeight - 0.5f, _titleBar.Width, TitleBarHeight - 0.5f);
+        };
+
+        _iconBox = new PictureBox
+        {
+            Location = new Point(8, (TitleBarHeight - 16) / 2),
+            Size = new Size(16, 16),
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = Color.Transparent,
+        };
+        if (Icon != null)
+        {
+            using var small = new Icon(Icon, 16, 16);
+            _iconBox.Image = small.ToBitmap();
+        }
+
+        var titleLabel = new Label
+        {
+            Text = Text,
+            AutoSize = false,
+            Location = new Point(30, 0),
+            Size = new Size(650, TitleBarHeight - 1),   // 不压住底部那条分割线
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = textColor,
+            BackColor = Color.Transparent,
+        };
+
+        // 右侧三个窗口按钮：置顶 / 最小化 / 关闭，等宽紧贴排列（从右往左数）
+        _tip = new ToolTip();
+
+        _pinBtn = MakeTitleBarButton(TitleIcon.Pin, barColor);
+        _pinBtn.Location = new Point(ClientSize.Width - TitleButtonWidth * 3, 0);
+        _pinBtn.AccessibleName = "置顶";
+        _pinBtn.Click += (s, e) => { TopMost = !TopMost; UpdatePinButtonVisual(); };
+        _tip.SetToolTip(_pinBtn, "置顶（窗口始终显示在最前）");
+
+        var minBtn = MakeTitleBarButton(TitleIcon.Minimize, barColor);
+        minBtn.Location = new Point(ClientSize.Width - TitleButtonWidth * 2, 0);
+        minBtn.AccessibleName = "最小化";
+        minBtn.Click += (s, e) => WindowState = FormWindowState.Minimized;
+        _tip.SetToolTip(minBtn, "最小化");
+
+        var closeBtn = MakeTitleBarButton(TitleIcon.Close, barColor);
+        closeBtn.Location = new Point(ClientSize.Width - TitleButtonWidth, 0);
+        closeBtn.AccessibleName = "关闭";
+        closeBtn.FlatAppearance.MouseOverBackColor = Color.FromArgb(232, 17, 35);
+        closeBtn.FlatAppearance.MouseDownBackColor = Color.FromArgb(200, 10, 30);
+        closeBtn.MouseEnter += (s, e) => { closeBtn.ForeColor = Color.White; closeBtn.Invalidate(); };
+        closeBtn.MouseLeave += (s, e) => { closeBtn.ForeColor = IconColor; closeBtn.Invalidate(); };
+        closeBtn.Click += (s, e) => Close();
+        _tip.SetToolTip(closeBtn, "关闭");
+
+        _titleBar.Controls.Add(_iconBox);
+        _titleBar.Controls.Add(titleLabel);
+        _titleBar.Controls.Add(_pinBtn);
+        _titleBar.Controls.Add(minBtn);
+        _titleBar.Controls.Add(closeBtn);
+
+        // 按住标题栏空白处拖动窗口（使用系统原生移动，支持贴边）
+        _titleBar.MouseDown += StartWindowDrag;
+        titleLabel.MouseDown += StartWindowDrag;
+        _iconBox.MouseDown += StartWindowDrag;
+
+        UpdatePinButtonVisual();
+    }
+
+    private Button MakeTitleBarButton(TitleIcon kind, Color backColor)
+    {
+        var b = new TitleBarButton
+        {
+            Size = new Size(TitleButtonWidth, TitleButtonHeight),
+            FlatStyle = FlatStyle.Flat,
+            ForeColor = IconColor,
+            BackColor = backColor,
+            UseVisualStyleBackColor = false,
+            TabStop = false,
+            Cursor = Cursors.Hand,
+            Tag = kind,
+        };
+        b.FlatAppearance.BorderSize = 0;
+        b.FlatAppearance.MouseOverBackColor = Color.FromArgb(229, 229, 229);
+        b.FlatAppearance.MouseDownBackColor = Color.FromArgb(209, 209, 209);
+        b.Paint += TitleButtonPaint;
+        return b;
+    }
+
+    private void StartWindowDrag(object sender, MouseEventArgs e)
+    {
+        if (e.Button != MouseButtons.Left) return;
+        ReleaseCapture();
+        SendMessage(Handle, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+    }
+
+    // 三个窗口按钮统一用矢量绘制：同一图标框、同一线宽，大小和视觉重量才一致
+    private void TitleButtonPaint(object sender, PaintEventArgs e)
+    {
+        var btn = (Button)sender;
+        var kind = (TitleIcon)btn.Tag;
+        Graphics g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+
+        float cx = btn.Width / 2f;
+        float cy = TitleBarHeight / 2f;   // 按整条标题栏居中（按钮高度少 1px，不能用按钮自身高度算）
+
+        using var pen = new Pen(btn.ForeColor, IconStroke)
+        {
+            LineJoin = LineJoin.Round,
+            StartCap = LineCap.Round,
+            EndCap = LineCap.Round,
+        };
+
+        switch (kind)
+        {
+            case TitleIcon.Minimize:
+                g.DrawLine(pen, cx - IconHalf, cy, cx + IconHalf, cy);
+                break;
+
+            case TitleIcon.Close:
+                g.DrawLine(pen, cx - IconHalf, cy - IconHalf, cx + IconHalf, cy + IconHalf);
+                g.DrawLine(pen, cx - IconHalf, cy + IconHalf, cx + IconHalf, cy - IconHalf);
+                break;
+
+            case TitleIcon.Pin:
+                using (var path = PinPath(cx, cy))
+                {
+                    if (TopMost)
+                    {
+                        // 已置顶：把图钉内部填实（不再用整块蓝底）
+                        using var brush = new SolidBrush(btn.ForeColor);
+                        g.FillPath(brush, path);
+                    }
+                    g.DrawPath(pen, path);
+                }
+                break;
+        }
+    }
+
+    // 图钉轮廓：原始图形按 20 单位见方设计（宽 12、高 14），缩到约 10x12 后以 (cx, cy) 为中心
+    private static GraphicsPath PinPath(float cx, float cy)
+    {
+        const float scale = 10f / 12f;
+        PointF P(float x, float y) => new(cx + (x - 10f) * scale, cy + (y - 10f) * scale);
+
+        var path = new GraphicsPath();
+        path.AddPolygon(new[]
+        {
+            P(6.5f, 3f), P(13.5f, 3f),      // 顶部横帽
+            P(12.5f, 6f), P(16f, 11f),      // 右侧收腰、外扩
+            P(11.5f, 11f), P(10f, 17f),     // 底部右缘、针尖
+            P(8.5f, 11f), P(4f, 11f),       // 针尖回左、底部左缘
+            P(7.5f, 6f),                    // 左侧外扩回腰
+        });
+        path.CloseFigure();
+        return path;
+    }
+
+    // 置顶状态只影响图钉本身（实心/空心），按钮背景与最小化、关闭保持一致
+    private void UpdatePinButtonVisual()
+    {
+        _pinBtn.Invalidate();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _tip?.Dispose();
+            _iconBox?.Image?.Dispose();   // PictureBox.Dispose 不会释放 Image，这里手动释放
+        }
+        base.Dispose(disposing);
+    }
+
     // ======================= 连接 / 断开 =======================
 
     private async void ConnectPlc()
@@ -328,7 +605,7 @@ public class MainForm : Form
         string ip = _ipBox.Text.Trim();
         if (ip.Length == 0)
         {
-            MessageBox.Show("请先填写 PLC 的 IP 地址。", "提示");
+            MessageBox.Show(this, "请先填写 PLC 的 IP 地址。", "提示");
             return;
         }
 
@@ -637,12 +914,6 @@ public class MainForm : Form
             _inputBtns[i].BackColor = SystemColors.Control;   // 输入按钮全部熄灭
         for (int i = 0; i < _typeBtns.Length; i++)
             UpdateTypeButtons(i);   // NO/NC 切换按钮回 NO
-    }
-
-    protected override void OnMouseDown(MouseEventArgs e)
-    {
-        base.OnMouseDown(e);
-        ActiveControl = null; // 点窗体空白处，让输入框失去焦点
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)

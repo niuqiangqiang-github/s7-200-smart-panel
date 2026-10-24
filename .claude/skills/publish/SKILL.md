@@ -1,10 +1,12 @@
 ---
 name: publish
-description: 发布 Smart200Panel 面板程序。默认框架依赖版；参数写 single 时打包单文件版。
+description: 发布 Smart200Panel 面板程序。默认打包单文件版；参数写 framework 时打包框架依赖版。
 disable-model-invocation: true
 ---
 
-发布类型：$ARGUMENTS（空 = 框架依赖版；single = 单文件版）
+发布类型：$ARGUMENTS（空 = 单文件版；framework = 框架依赖版）
+
+日常交付以单文件版为准，框架依赖版只用于本机快速验证。
 
 打包产物统一改名为 `S7-200SMART-I／O面板.exe`。Windows 文件名不允许半角 `/`，用全角 `／`；程序集名仍是 `Smart200Panel`，只改文件名不影响运行。
 
@@ -17,19 +19,19 @@ disable-model-invocation: true
    `v=$(cat Smart200Panel/version.txt); IFS=. read -r a b c <<< "$v"; echo "$a.$b.$((c+1))" > Smart200Panel/version.txt`
 
 3. 编译并发布：
-   - 框架依赖版：
-     `dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -o publish`
-   - 单文件版：
+   - 单文件版（默认）：
      `dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -o publish-single`
+   - 框架依赖版（参数 framework）：
+     `dotnet publish Smart200Panel/Smart200Panel.csproj -c Release -o publish`
 
 4. 把刚生成的 `Smart200Panel.exe` 改成目标文件名（重复发布时覆盖旧的）：
-   - 框架依赖版：`mv -f "publish/Smart200Panel.exe" "publish/S7-200SMART-I／O面板.exe"`
    - 单文件版：`mv -f "publish-single/Smart200Panel.exe" "publish-single/S7-200SMART-I／O面板.exe"`
+   - 框架依赖版：`mv -f "publish/Smart200Panel.exe" "publish/S7-200SMART-I／O面板.exe"`
 
 5. 任一编译报错 → 立即停下，把错误原文给我，不要启动程序。
 
 6. 启动新程序：
-   - 框架依赖版：
-     `powershell -Command "Start-Process '.\publish\S7-200SMART-I／O面板.exe'"`
    - 单文件版：
      `powershell -Command "Start-Process '.\publish-single\S7-200SMART-I／O面板.exe'"`
+   - 框架依赖版：
+     `powershell -Command "Start-Process '.\publish\S7-200SMART-I／O面板.exe'"`
